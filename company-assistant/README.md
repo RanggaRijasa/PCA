@@ -199,7 +199,15 @@ eval/reports/YYYY-MM-DD-eval-results.json
 
 The Admin Evaluation page reads the JSON report through `/api/evaluation/runs`. Permission correctness must remain 100% and critical leakage must remain zero before company use.
 
-Latest RAG fixes on June 14, 2026: the hybrid reranker now prefers the current effective version over stale or explicitly outdated policy chunks, and model-generated insufficient-evidence answers are converted into formal refusals with empty sources. Verified smoke checks ranked `HR_Remote_Work_Policy_v2.1.pdf` above the outdated v1.0 policy and returned a formal refusal for the viewer finance-bonus request. The 70-question evaluation ran at 63/70 passed with 100% refusal correctness, 100% permission correctness, and no critical leakage; remaining misses are answer-quality/citation-review cases in synthetic/sample data.
+`expected_answer_keywords` supports both the original format and mixed-language alias groups:
+
+```text
+manager|manajer;review|meninjau;reimbursement|penggantian
+```
+
+For alias-aware rows, `;` separates required concept groups and `|` separates acceptable aliases inside one group. Keyword correctness uses the existing 60% matched-concept threshold. Rows without `;` retain the legacy behavior where commas or pipes separate independently expected keywords.
+
+Latest Gemma 4 12B evaluation on June 14, 2026: 70/70 passed with 100% retrieval hit rate, answer correctness, citation correctness, refusal correctness, and permission correctness; hallucination rate 0%; no critical leakage; 19,238 ms average latency and 55,325 ms p95. Alias groups resolved the four prior semantically-correct mixed Indonesian-English mismatches without changing retrieval, permissions, citations, refusals, prompt-injection handling, or leakage checks.
 
 ## Backup
 
@@ -279,7 +287,7 @@ The `.gitignore` excludes `.env`, ZIP archives, raw, processed, extracted test-c
 - Login throttling, account lockout, password reset, and CSRF tokens are not implemented.
 - Chroma backup is a filesystem copy; stop active ingestion for the cleanest snapshot.
 - The lightweight reranker is not a cross-encoder.
-- The imported corpus contains only 15 evaluation questions and is a smoke suite, not a release benchmark.
-- Current synthetic failures include incomplete answer wording, mixed-language specificity, and formal refusal classification when authorized retrieval returns only irrelevant evidence.
+- The imported archive contributes 15 cases; the active production gate expands this to 70 synthetic and sample-document questions.
+- Evaluation quality still depends on the configured local model and indexed corpus, and the 12B run has a measured p95 latency above 55 seconds.
 
 See [HANDOFF.md](HANDOFF.md) for the final Phase 12-13 implementation inventory and measured checks.

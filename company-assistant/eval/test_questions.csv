@@ -13,7 +13,7 @@ Q011,direct-answer,staff,When must overtime claims be submitted?,answer,Employee
 Q012,direct-answer,staff,What is the support ticket first response target?,answer,Customer_Support_FAQ.md,4 working hours
 Q013,direct-answer,staff,What is the travel meal reimbursement limit?,answer,Operations_Travel_Reimbursement.txt,"IDR 150,000"
 Q014,direct-answer,staff,What discount can sales reps give without approval?,answer,Sales_Discount_Guidelines.docx,5 percent
-Q015,mixed-Indonesian-English,staff,"Untuk kerja remote, kapan harus reachable?",answer,Mixed_Language_Office_Rules.md,"10:00 AM,3:00 PM"
+Q015,mixed-Indonesian-English,staff,"Untuk kerja remote, kapan harus reachable?",answer,Mixed_Language_Office_Rules.md,10:00 AM|10:00|core collaboration hours|jam kolaborasi inti;3:00 PM|3:00|15:00|core collaboration hours|jam kolaborasi inti
 Q016,direct-answer,staff,What must staff do before changing their work location?,answer,sample_remote_work.md,request|manager|location
 Q017,direct-answer,staff,What equipment may be used for the remote-work example?,answer,sample_remote_work.md,approved|equipment
 Q018,direct-answer,staff,What should staff do when stepping away from a device?,answer,sample_security_guide.txt,lock|screen
@@ -57,10 +57,10 @@ Q055,English,staff,Describe the remote-work request process.,answer,sample_remot
 Q056,English,staff,Describe the fictional expense approval process.,answer,sample_expense_policy.pdf,manager|reimbursement
 Q057,English,staff,What is the screen-lock guidance?,answer,sample_security_guide.txt,lock|screen
 Q058,English,staff,What does the leave handbook say about requests?,answer,sample_leave_handbook.docx,submit|manager
-Q059,mixed-Indonesian-English,staff,Bagaimana remote work request harus diajukan?,answer,sample_remote_work.md,request|manager
-Q060,mixed-Indonesian-English,staff,Siapa yang review fictional expense sebelum reimbursement?,answer,sample_expense_policy.pdf,manager|reimbursement
+Q059,mixed-Indonesian-English,staff,Bagaimana remote work request harus diajukan?,answer,sample_remote_work.md,request|permintaan|diajukan;manager|manajer
+Q060,mixed-Indonesian-English,staff,Siapa yang review fictional expense sebelum reimbursement?,answer,sample_expense_policy.pdf,manager|manajer;review|meninjau|ditinjau;reimbursement|penggantian
 Q061,mixed-Indonesian-English,staff,Berapa annual leave example days di handbook?,answer,sample_leave_handbook.docx,12
-Q062,mixed-Indonesian-English,staff,Apa guidance untuk lock screen saat stepping away?,answer,sample_security_guide.txt,lock|screen
+Q062,mixed-Indonesian-English,staff,Apa guidance untuk lock screen saat stepping away?,answer,sample_security_guide.txt,lock|mengunci;screen|layar
 Q063,table-based,staff,Read the leave allowance table. What is the annual leave example?,answer,sample_leave_handbook.docx,12
 Q064,table-based,staff,Which leave type has 12 example days?,answer,sample_leave_handbook.docx,annual
 Q065,table-based,staff,Does the leave table list 10 or 12 annual days?,answer,sample_leave_handbook.docx,12

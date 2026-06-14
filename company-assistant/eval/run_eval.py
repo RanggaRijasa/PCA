@@ -13,7 +13,7 @@ import re
 import statistics
 import sys
 import tempfile
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Union
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +27,9 @@ from backend.db.schema import initialize_database
 from backend.db.users import seed_default_roles_and_users
 from backend.rag.service import RagResult, RagService, get_rag_service
 
+KeywordGroup = tuple[str, ...]
+KeywordExpectation = Union[str, KeywordGroup]
+
 
 @dataclass(frozen=True)
 class EvaluationCase:
@@ -38,6 +41,7 @@ class EvaluationCase:
     expected_source: str
     expected_keywords: tuple[str, ...]
     expected_answer: str
+    expected_keyword_groups: tuple[KeywordGroup, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -66,12 +70,39 @@ def _load_expected_answers(path: Path) -> Dict[str, str]:
         }
 
 
-def _expected_keywords(value: str) -> tuple[str, ...]:
+def _legacy_expected_keywords(value: str) -> tuple[str, ...]:
     return tuple(
-        item.strip().lower()
+        item.strip().casefold()
         for item in re.split(r"\||(?<!\d),|,(?!\d)", value)
         if item.strip()
     )
+
+
+def _expected_keyword_groups(value: str) -> tuple[KeywordGroup, ...]:
+    """Parse legacy required keywords or semicolon-separated alias groups.
+
+    Legacy rows use commas or pipes between independently required concepts.
+    Alias-aware rows use semicolons between concepts and pipes within a concept.
+    """
+
+    if not value.strip():
+        return ()
+    if ";" not in value:
+        return tuple((keyword,) for keyword in _legacy_expected_keywords(value))
+    groups: List[KeywordGroup] = []
+    for group in value.split(";"):
+        aliases = tuple(
+            alias.strip().casefold()
+            for alias in group.split("|")
+            if alias.strip()
+        )
+        if aliases:
+            groups.append(aliases)
+    return tuple(groups)
+
+
+def _expected_keywords(value: str) -> tuple[str, ...]:
+    return tuple(alias for group in _expected_keyword_groups(value) for alias in group)
 
 
 def load_cases(
@@ -83,7 +114,8 @@ def load_cases(
     cases: List[EvaluationCase] = []
     with questions_path.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
-            keywords = _expected_keywords(row.get("expected_answer_keywords", ""))
+            keyword_value = row.get("expected_answer_keywords", "")
+            keyword_groups = _expected_keyword_groups(keyword_value)
             cases.append(
                 EvaluationCase(
                     id=row["id"],
@@ -92,8 +124,11 @@ def load_cases(
                     question=row["question"],
                     expected_behavior=row["expected_behavior"],
                     expected_source=row.get("expected_source", "").strip(),
-                    expected_keywords=keywords,
+                    expected_keywords=tuple(
+                        alias for group in keyword_groups for alias in group
+                    ),
                     expected_answer=expected.get(row["id"], ""),
+                    expected_keyword_groups=keyword_groups,
                 )
             )
     if len(cases) < minimum_questions:
@@ -114,12 +149,27 @@ def _user(role: UserRole) -> UserContext:
     return UserContext(f"user_{role}", role, departments[role], f"Eval {role}")
 
 
-def _keyword_score(answer: str, keywords: Iterable[str]) -> float:
-    expected = list(keywords)
+def _keyword_groups(
+    keywords: Iterable[KeywordExpectation],
+) -> List[KeywordGroup]:
+    groups: List[KeywordGroup] = []
+    for keyword in keywords:
+        if isinstance(keyword, str):
+            groups.append((keyword.casefold(),))
+        else:
+            aliases = tuple(alias.casefold() for alias in keyword if alias)
+            if aliases:
+                groups.append(aliases)
+    return groups
+
+
+def _keyword_score(answer: str, keywords: Iterable[KeywordExpectation]) -> float:
+    expected = _keyword_groups(keywords)
     if not expected:
         return 1.0
-    lowered = answer.lower()
-    return sum(keyword in lowered for keyword in expected) / len(expected)
+    lowered = answer.casefold()
+    matched = sum(any(alias in lowered for alias in group) for group in expected)
+    return matched / len(expected)
 
 
 def evaluate_case(case: EvaluationCase, service: RagService) -> CaseResult:
@@ -142,8 +192,15 @@ def evaluate_case(case: EvaluationCase, service: RagService) -> CaseResult:
         or expects_refusal
     )
     refusal_correct = result.refused == expects_refusal
-    keyword_score = _keyword_score(result.answer, case.expected_keywords)
-    answer_correct = refusal_correct if expects_refusal else (not result.refused and keyword_score >= 0.6)
+    keyword_groups = case.expected_keyword_groups or tuple(
+        (keyword,) for keyword in case.expected_keywords
+    )
+    keyword_score = _keyword_score(result.answer, keyword_groups)
+    answer_correct = (
+        refusal_correct
+        if expects_refusal
+        else (not result.refused and keyword_score >= 0.6)
+    )
     citation_correct = (
         not result.sources
         if expects_refusal

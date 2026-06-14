@@ -242,3 +242,55 @@ cd company-assistant
 ### Next Recommended Step
 
 - Run the full 70-question evaluation after any corpus or model change and review every failed answer/citation case while keeping permission correctness at 100%.
+
+## Mixed-Language Evaluation Aliases - June 14, 2026
+
+### Completed
+
+- Added backward-compatible keyword alias groups to the evaluation harness.
+- Alias-aware rows use `;` between required concepts and `|` between acceptable English/Indonesian terms within a concept.
+- Preserved legacy rows: when no semicolon is present, existing comma- and pipe-separated keywords remain independently required concepts.
+- Kept the existing answer threshold at 60% of required concept groups matched.
+- Updated `Q015`, `Q059`, `Q060`, and `Q062` with mixed-language aliases.
+- Added parser and scorer coverage for translated terms, partial concept matching, legacy pipe/comma rows, currency commas, and all four updated cases.
+- Did not change retrieval, reranking, permissions, citations, refusal behavior, prompt-injection checks, or leakage checks.
+
+### Files Changed
+
+- `eval/run_eval.py`: alias-group parsing and group-based keyword scoring.
+- `eval/test_questions.csv`: aliases for `Q015`, `Q059`, `Q060`, and `Q062`.
+- `tests/test_evaluation_harness.py`: alias and backward-compatibility regression coverage.
+- `eval/reports/2026-06-14-eval-report.md`: refreshed 70-case report.
+- `eval/reports/2026-06-14-eval-results.json`: refreshed machine-readable results.
+- `README.md`, `HANDOFF.md`: syntax, results, and limitations.
+
+### How To Run
+
+```bash
+python eval/run_eval.py
+```
+
+Run from an activated project environment with the configured Ollama model available.
+
+### Checks Performed
+
+- Python syntax compilation passed for the evaluation harness and its test module.
+- Per the user request, the virtual-environment pytest run was skipped.
+- Full Gemma 4 12B evaluation: 70/70 passed.
+- Retrieval hit rate: 100%.
+- Answer and citation correctness: 100%.
+- Refusal and permission correctness: 100%.
+- Hallucination rate: 0%.
+- Critical data leakage: none.
+- Average latency: 19,238 ms; p95 latency: 55,325 ms.
+- Failed cases: none.
+
+### Known Limitations
+
+- Alias groups are curated evaluation expectations, not semantic similarity scoring; new translation variants must be added deliberately.
+- The benchmark uses synthetic and sample documents rather than approved representative company fixtures.
+- Gemma 4 12B latency remains substantial on the current local hardware.
+
+### Next Recommended Step
+
+- Preserve this 70-case report as the model baseline and add aliases only when manual review confirms that a failed answer is semantically equivalent, never to excuse permission, refusal, citation, prompt-injection, or leakage failures.
