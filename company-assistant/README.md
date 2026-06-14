@@ -87,13 +87,15 @@ Verify permission-filtered retrieval:
 .venv/bin/python scripts/test_retrieval.py --role staff "What is our remote work policy?"
 ```
 
-The imported synthetic suite has 15 questions, so run it explicitly as a smoke evaluation:
+The imported archive includes a 15-question starter suite. This repository keeps the active evaluation files expanded to 70 questions by combining those synthetic cases with the existing sample-document production gate. Re-running the importer preserves an existing 50+ question active set instead of shrinking it back to the starter suite.
+
+Run the active production-sized evaluation with:
 
 ```bash
-.venv/bin/python eval/run_eval.py --allow-small-set
+.venv/bin/python eval/run_eval.py
 ```
 
-The normal `python eval/run_eval.py` command retains the 50-question production gate and intentionally rejects this starter suite until it is expanded. Real company documents, metadata exports, archives, vectors, databases, and evaluation backups must not be committed.
+Real company documents, metadata exports, archives, vectors, databases, and evaluation backups must not be committed.
 
 ## Run Everything
 
@@ -180,16 +182,12 @@ The permission matrix is:
 
 ## Evaluation
 
-Ensure Ollama is running and the corpus is indexed. A production-sized set runs with:
+Ensure Ollama is running and the corpus is indexed. The active evaluation set contains 70 questions across direct answer, multi-document, no-answer, permission-restricted, outdated-document trap, conflicting-source, Indonesian, English, mixed-language, table-based, and prompt-injection categories.
+
+Run the production-sized gate with:
 
 ```bash
 python eval/run_eval.py
-```
-
-For the imported 15-question synthetic starter set, use:
-
-```bash
-python eval/run_eval.py --allow-small-set
 ```
 
 Reports are written to:
@@ -201,7 +199,7 @@ eval/reports/YYYY-MM-DD-eval-results.json
 
 The Admin Evaluation page reads the JSON report through `/api/evaluation/runs`. Permission correctness must remain 100% and critical leakage must remain zero before company use.
 
-Latest synthetic smoke run on June 14, 2026: 11/15 passed, no critical leakage, 100% retrieval and citation correctness, 80% refusal correctness, 93.3% permission-behavior correctness, 705 ms average latency, and 2580 ms p95. Direct retrieval correctly excluded the admin-only salary policy for staff and returned it for admin; the lower permission-behavior score came from the answer layer describing missing evidence instead of setting the formal refusal flag. The RAG runtime was not changed during corpus import.
+Latest RAG fixes on June 14, 2026: the hybrid reranker now prefers the current effective version over stale or explicitly outdated policy chunks, and model-generated insufficient-evidence answers are converted into formal refusals with empty sources. Verified smoke checks ranked `HR_Remote_Work_Policy_v2.1.pdf` above the outdated v1.0 policy and returned a formal refusal for the viewer finance-bonus request. The 70-question evaluation ran at 63/70 passed with 100% refusal correctness, 100% permission correctness, and no critical leakage; remaining misses are answer-quality/citation-review cases in synthetic/sample data.
 
 ## Backup
 

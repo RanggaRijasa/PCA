@@ -28,6 +28,7 @@ REQUIRED_PATHS = (
     *DOCUMENT_FOLDERS,
 )
 MAX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
+MIN_PRODUCTION_QUESTIONS = 50
 
 
 class CorpusImportError(RuntimeError):
@@ -205,6 +206,19 @@ def _starter_expected_answers(questions_path: Path) -> bytes:
         )
     return output.getvalue().encode("utf-8")
 
+def _question_count(path: Path) -> int:
+    if not path.is_file():
+        return 0
+    with path.open(newline="", encoding="utf-8-sig") as handle:
+        return sum(1 for _row in csv.DictReader(handle))
+
+
+def _should_preserve_production_eval(source: Path, target: Path) -> bool:
+    return (
+        _question_count(target) >= MIN_PRODUCTION_QUESTIONS
+        and _question_count(source) < MIN_PRODUCTION_QUESTIONS
+    )
+
 
 def _write_bytes_with_backup(
     content: bytes,
@@ -244,29 +258,42 @@ def import_corpus(
     stamp = timestamp or datetime.now().strftime("%Y%m%d-%H%M%S")
     eval_root = project_root / "eval"
     backup_dir = eval_root / "backups"
-    questions_changed, questions_backup = _replace_with_backup(
-        imported_root / "eval" / "test_questions.csv",
-        eval_root / "test_questions.csv",
-        backup_dir,
-        stamp,
+    imported_questions = imported_root / "eval" / "test_questions.csv"
+    active_questions = eval_root / "test_questions.csv"
+    preserve_production_eval = _should_preserve_production_eval(
+        imported_questions,
+        active_questions,
     )
-    corpus_expected = imported_root / "eval" / "expected_answers.csv"
-    if corpus_expected.is_file():
-        expected_changed, expected_backup = _replace_with_backup(
-            corpus_expected,
-            eval_root / "expected_answers.csv",
-            backup_dir,
-            stamp,
-        )
+    if preserve_production_eval:
+        questions_changed = False
+        questions_backup = None
+        expected_changed = False
+        expected_backup = None
         expected_generated = False
     else:
-        expected_changed, expected_backup = _write_bytes_with_backup(
-            _starter_expected_answers(imported_root / "eval" / "test_questions.csv"),
-            eval_root / "expected_answers.csv",
+        questions_changed, questions_backup = _replace_with_backup(
+            imported_questions,
+            active_questions,
             backup_dir,
             stamp,
         )
-        expected_generated = True
+        corpus_expected = imported_root / "eval" / "expected_answers.csv"
+        if corpus_expected.is_file():
+            expected_changed, expected_backup = _replace_with_backup(
+                corpus_expected,
+                eval_root / "expected_answers.csv",
+                backup_dir,
+                stamp,
+            )
+            expected_generated = False
+        else:
+            expected_changed, expected_backup = _write_bytes_with_backup(
+                _starter_expected_answers(imported_questions),
+                eval_root / "expected_answers.csv",
+                backup_dir,
+                stamp,
+            )
+            expected_generated = True
 
     return {
         "archive": archive_path,
@@ -280,6 +307,7 @@ def import_corpus(
         "expected_changed": expected_changed,
         "expected_backup": expected_backup,
         "expected_generated": expected_generated,
+        "production_eval_preserved": preserve_production_eval,
     }
 
 
@@ -302,10 +330,13 @@ def main() -> int:
         "Metadata CSV: "
         + ("updated" if summary["metadata_changed"] else "already current")
     )
-    print(
-        "Evaluation questions: "
-        + ("updated" if summary["questions_changed"] else "already current")
-    )
+    if summary["production_eval_preserved"]:
+        print("Evaluation questions: preserved existing 50+ production set")
+    else:
+        print(
+            "Evaluation questions: "
+            + ("updated" if summary["questions_changed"] else "already current")
+        )
     if summary["questions_backup"]:
         print(f"Previous questions backup: {summary['questions_backup']}")
     if summary["expected_generated"]:
@@ -321,7 +352,10 @@ def main() -> int:
         print(f"Previous expected answers backup: {summary['expected_backup']}")
     print("Next: .venv/bin/python scripts/init_db.py")
     print("Then: .venv/bin/python ingestion/ingest_folder.py")
-    print("Starter evaluation: .venv/bin/python eval/run_eval.py --allow-small-set")
+    if summary["production_eval_preserved"]:
+        print("Evaluation: .venv/bin/python eval/run_eval.py")
+    else:
+        print("Starter evaluation: .venv/bin/python eval/run_eval.py --allow-small-set")
     return 0
 
 

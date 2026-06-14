@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 from dataclasses import replace
-from typing import Iterable, List, Set
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from backend.rag.retriever import RetrievedChunk
 
@@ -27,6 +28,44 @@ def meaningful_tokens(text: str) -> Set[str]:
     }
 
 
+_STALE_MARKERS = ("outdated", "superseded", "obsolete", "deprecated")
+_VERSION_TOKEN = re.compile(r"v?\d+(?:\.\d+)*|\d{4}", re.I)
+
+
+def _parse_effective_date(value: str | None) -> Optional[date]:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value[:10])
+    except ValueError:
+        return None
+
+
+def _family_tokens(text: str) -> Tuple[str, ...]:
+    normalized = re.sub(r"[_./-]+", " ", text)
+    tokens = {
+        token
+        for token in meaningful_tokens(normalized)
+        if token not in _STALE_MARKERS and not _VERSION_TOKEN.fullmatch(token)
+    }
+    return tuple(sorted(tokens))
+
+
+def _document_family_key(chunk: RetrievedChunk) -> Tuple[str, ...]:
+    title_key = _family_tokens(chunk.title)
+    if title_key:
+        return title_key
+    source_key = _family_tokens(chunk.source_file)
+    return source_key or (chunk.document_id,)
+
+
+def _stale_adjustment(chunk: RetrievedChunk) -> float:
+    haystack = f"{chunk.title} {chunk.source_file}".casefold()
+    if any(marker in haystack for marker in _STALE_MARKERS):
+        return -0.12
+    return 0.0
+
+
 class HybridReranker:
     """Blend Chroma cosine similarity with deterministic lexical coverage."""
 
@@ -37,8 +76,21 @@ class HybridReranker:
         top_k: int = 5,
     ) -> List[RetrievedChunk]:
         query_tokens = meaningful_tokens(question)
+        candidates = list(chunks)
+        family_dates: Dict[Tuple[str, ...], Set[date]] = {}
+        for chunk in candidates:
+            effective_date = _parse_effective_date(chunk.effective_date)
+            if effective_date is None:
+                continue
+            family_dates.setdefault(_document_family_key(chunk), set()).add(effective_date)
+        latest_by_family = {
+            family: max(dates)
+            for family, dates in family_dates.items()
+            if len(dates) > 1
+        }
+
         reranked: List[RetrievedChunk] = []
-        for chunk in chunks:
+        for chunk in candidates:
             searchable = " ".join(
                 part for part in (chunk.title, chunk.section or "", chunk.content) if part
             )
@@ -57,13 +109,25 @@ class HybridReranker:
                 for label in ("approval", "eligibility", "process", "requirement", "steps")
             ):
                 section_adjustment = 0.08
+
+            version_adjustment = 0.0
+            effective_date = _parse_effective_date(chunk.effective_date)
+            latest_effective_date = latest_by_family.get(_document_family_key(chunk))
+            if effective_date is not None and latest_effective_date is not None:
+                if effective_date == latest_effective_date:
+                    version_adjustment = 0.04
+                elif effective_date < latest_effective_date:
+                    version_adjustment = -0.08
+
             relevance_score = max(
                 0.0,
                 min(
                     1.0,
                     (chunk.vector_score * 0.70)
                     + (lexical_overlap * 0.30)
-                    + section_adjustment,
+                    + section_adjustment
+                    + version_adjustment
+                    + _stale_adjustment(chunk),
                 ),
             )
             reranked.append(

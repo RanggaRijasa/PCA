@@ -4,6 +4,11 @@
 
 This repository builds a private, local-first company RAG assistant. The assistant runs locally, uses approved company documents, retrieves permission-filtered evidence, generates grounded answers with citations, and writes audit logs.
 
+
+## Working Directory Rule
+
+Codex must treat `company-assistant/` as the application working directory. Use `cwd="company-assistant"` for shell commands and keep source, test, evaluation, and runtime changes inside that directory unless a task explicitly targets root-level repository context such as this file or the root `README.md`.
+
 ## Source of Truth
 
 Before making changes, read the Markdown files in `docs/` in this order:

@@ -1,37 +1,31 @@
 from pathlib import Path
 
-import pytest
-
 from eval.run_eval import CaseResult, build_summary, load_cases
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_evaluation_dataset_is_a_valid_small_corpus_but_keeps_quality_gate() -> None:
-    with pytest.raises(ValueError, match="at least 50"):
-        load_cases(
-            PROJECT_ROOT / "eval/test_questions.csv",
-            PROJECT_ROOT / "eval/expected_answers.csv",
-        )
-
+def test_evaluation_dataset_meets_production_gate_and_required_categories() -> None:
     cases = load_cases(
         PROJECT_ROOT / "eval/test_questions.csv",
         PROJECT_ROOT / "eval/expected_answers.csv",
-        minimum_questions=1,
     )
     categories = {case.category for case in cases}
-    assert len(cases) == 15
-    assert categories == {
-        "direct",
-        "outdated",
-        "permission",
-        "table",
-        "indonesian",
-        "prompt_injection",
-        "no_answer",
-        "mixed",
-    }
+    assert len(cases) == 70
+    assert {
+        "direct-answer",
+        "multi-document",
+        "no-answer",
+        "permission-restricted",
+        "outdated-document-trap",
+        "conflicting-source",
+        "Indonesian",
+        "English",
+        "mixed-Indonesian-English",
+        "table-based",
+        "prompt-injection",
+    }.issubset(categories)
     assert cases[0].expected_keywords == ("2 days", "manager approval", "3 months")
     assert cases[5].expected_keywords == ("idr 1,500,000",)
 

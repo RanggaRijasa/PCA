@@ -8,6 +8,22 @@ from typing import Iterable
 
 _CITATION_PATTERN = re.compile(r"\[(\d+)\]")
 
+_REFUSAL_PATTERNS = (
+    re.compile(r"\bi (?:could not|can't|cannot|do not|don't) (?:find|provide|answer)\b", re.I),
+    re.compile(r"\bnot found in (?:the )?approved company documents\b", re.I),
+    re.compile(r"\bcontext (?:is|was) insufficient\b", re.I),
+    re.compile(r"\binsufficient (?:context|evidence|information)\b", re.I),
+    re.compile(r"\bapproved context did not contain\b", re.I),
+    re.compile(r"\bno (?:relevant|supporting|sufficient) (?:evidence|source|context)\b", re.I),
+    re.compile(r"\bdoes not contain (?:enough|the requested|this information|information about)\b", re.I),
+    re.compile(r"\b(?:provided|approved) context does not contain\b", re.I),
+)
+
+
+def is_refusal_body(text: str) -> bool:
+    """Detect model output that is semantically a refusal."""
+    return any(pattern.search(text) for pattern in _REFUSAL_PATTERNS)
+
 
 def clean_answer_body(raw_text: str, source_count: int) -> str:
     text = raw_text.strip()

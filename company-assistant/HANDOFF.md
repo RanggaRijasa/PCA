@@ -190,3 +190,55 @@ Use `python eval/run_eval.py` only after restoring or expanding the active suite
 ### Next Recommended Step
 
 Review and expand the synthetic evaluation set to at least 50 cases, then address outdated-source ranking and insufficient-evidence refusal behavior in a separately scoped RAG-runtime task.
+
+## Evaluation And RAG Runtime Fixes - June 14, 2026
+
+### Completed
+
+- Replaced the root `README.md` placeholder with a pointer to `company-assistant/README.md` and documented that coding agents should work from `company-assistant/`.
+- Added the same working-directory rule to the root `AGENTS.md`.
+- Expanded the active evaluation suite from the imported 15-question starter to 70 questions by combining the synthetic corpus cases with the existing sample-document gate.
+- Updated the corpus importer so re-running a starter corpus import preserves an existing 50+ question production evaluation set.
+- Changed the hybrid reranker to prefer newer effective dates within a document family and penalize explicitly stale/outdated versions.
+- Converted model-generated insufficient-evidence text into a formal refusal flag with empty sources.
+
+### Files Changed
+
+- `../README.md`: root repository overview and app-directory pointer.
+- `../AGENTS.md`: Codex working-directory rule.
+- `README.md`: updated evaluation and RAG-fix notes.
+- `eval/test_questions.csv`: 70 active evaluation cases.
+- `eval/expected_answers.csv`: matching expected-answer notes for all active cases.
+- `scripts/import_test_corpus.py`: preserves an existing production-sized eval set when importing a small starter corpus.
+- `backend/rag/reranker.py`: current-version and stale-version ranking adjustments.
+- `backend/rag/response_parser.py`: semantic refusal detection for model output.
+- `backend/rag/service.py`: model insufficiency responses now set `refused=True`.
+- `tests/test_evaluation_harness.py`: production gate/category assertions.
+- `tests/test_import_test_corpus.py`: importer preservation regression.
+- `tests/test_retrieval.py`: current-version ranking and model-refusal regressions.
+
+### How To Run
+
+```bash
+cd company-assistant
+.venv/bin/python -m pytest tests/test_retrieval.py tests/test_evaluation_harness.py tests/test_import_test_corpus.py
+.venv/bin/python scripts/test_retrieval.py --role staff "What is our remote work policy?"
+.venv/bin/python eval/run_eval.py
+```
+
+### Checks Performed
+
+- Focused retrieval/evaluation/import tests: 13 passed.
+- Full backend test suite: 48 passed.
+- Retrieval smoke: `HR_Remote_Work_Policy_v2.1.pdf` now ranks above `HR_Remote_Work_Policy_v1.0_OUTDATED.md` for the broad remote-work query.
+- RAG refusal smoke: viewer finance-bonus question returned `refused=True`, `reason=insufficient_evidence`, and no sources.
+- Full evaluation: 63/70 passed; retrieval hit rate 95.1%; answer correctness 82.9%; citation correctness 95.1%; refusal correctness 100%; permission correctness 100%; hallucination rate 5.7%; no critical leakage.
+
+### Known Limitations
+
+- The 70-case active set still uses harmless synthetic and sample data; approved representative company fixtures are still required before deployment.
+- Full evaluation quality still depends on the local Ollama model and indexed corpus state.
+
+### Next Recommended Step
+
+- Run the full 70-question evaluation after any corpus or model change and review every failed answer/citation case while keeping permission correctness at 100%.

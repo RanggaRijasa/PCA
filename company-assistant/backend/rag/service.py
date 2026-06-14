@@ -24,7 +24,7 @@ from backend.llm.ollama_client import OllamaClient
 from backend.rag.citation_builder import build_api_sources, build_sources_section
 from backend.rag.prompt_builder import build_prompt
 from backend.rag.reranker import HybridReranker, has_sufficient_evidence
-from backend.rag.response_parser import clean_answer_body
+from backend.rag.response_parser import clean_answer_body, is_refusal_body
 from backend.rag.retriever import RetrievedChunk, VectorRetriever
 from backend.safety.input_checks import check_user_input
 from backend.safety.output_checks import unsafe_output_reason
@@ -347,14 +347,27 @@ class RagService:
                 refused = True
                 refusal_reason = output_reason
             else:
-                chunks = prepared.chunks
-                body = clean_answer_body(raw_body, len(chunks))
-                confidence = self._confidence(chunks)
-                notes = (
-                    f"Grounded in {len(chunks)} permission-filtered source chunk(s)."
+                model_reported_refusal = is_refusal_body(raw_body)
+                body = clean_answer_body(
+                    raw_body,
+                    0 if model_reported_refusal else len(prepared.chunks),
                 )
-                refused = False
-                refusal_reason = None
+                if model_reported_refusal or is_refusal_body(body):
+                    chunks = []
+                    confidence = "Low"
+                    notes = (
+                        "The generated output said the retrieved context was insufficient."
+                    )
+                    refused = True
+                    refusal_reason = "model_reported_insufficient_evidence"
+                else:
+                    chunks = prepared.chunks
+                    confidence = self._confidence(chunks)
+                    notes = (
+                        f"Grounded in {len(chunks)} permission-filtered source chunk(s)."
+                    )
+                    refused = False
+                    refusal_reason = None
             sources = build_api_sources(chunks)
             answer = self._assemble_answer(body, chunks, confidence, notes)
 

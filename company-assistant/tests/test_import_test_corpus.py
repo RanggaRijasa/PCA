@@ -102,6 +102,40 @@ def test_import_corpus_backs_up_eval_and_is_idempotent(tmp_path: Path) -> None:
     assert second["expected_changed"] is False
 
 
+def test_import_preserves_existing_production_eval_for_starter_corpus(
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "company-assistant"
+    (project / "eval").mkdir(parents=True)
+    production_questions = "id,category,user_role,question,expected_behavior,expected_source,expected_answer_keywords\n" + "".join(
+        f"Q{index:03d},direct-answer,staff,Question {index}?,answer,policy.md,safe\n"
+        for index in range(1, 51)
+    )
+    production_expected = "id,expected_answer,review_notes\n" + "".join(
+        f"Q{index:03d},Expected answer {index},Production case.\n"
+        for index in range(1, 51)
+    )
+    (project / "eval" / "test_questions.csv").write_text(
+        production_questions,
+        encoding="utf-8",
+    )
+    (project / "eval" / "expected_answers.csv").write_text(
+        production_expected,
+        encoding="utf-8",
+    )
+    archive = tmp_path / "company_assistant_test_corpus.zip"
+    _build_archive(archive)
+
+    result = import_corpus(project, archive, timestamp="20260614-130000")
+
+    assert result["production_eval_preserved"] is True
+    assert result["questions_changed"] is False
+    assert result["expected_changed"] is False
+    assert (project / "eval" / "test_questions.csv").read_text(
+        encoding="utf-8"
+    ) == production_questions
+
+
 def test_import_rejects_zip_path_traversal(tmp_path: Path) -> None:
     project = tmp_path / "company-assistant"
     archive = tmp_path / "company_assistant_test_corpus.zip"
